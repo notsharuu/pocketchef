@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "PocketChef",
+    "slug": "pocketchef",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "PocketChef needs camera access to scan your fridge and detect ingredients.",
+        "NSPhotoLibraryUsageDescription": "PocketChef needs photo library access to select fridge photos from your gallery.",
+        "NSLocalNetworkUsageDescription": "PocketChef connects to your local server over Wi-Fi to scan ingredients and suggest recipes.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

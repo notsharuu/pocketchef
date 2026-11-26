@@ -1,0 +1,25 @@
+{
+  "name": "pocketchef-backend",
+  "version": "1.0.0",
+  "description": "Backend API for PocketChef fridge scanning and recipe assistant",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "node --test tests/**/*.test.js",
+    "scan": "node scripts/test_scan.js",
+    "ingest": "python3 scripts/ingest_datasets.py",
+    "build-vectordb": "node scripts/build_vector_db.js"
+  },
+  "dependencies": {
+    "@google/genai": "^2.3.0",
+    "@huggingface/transformers": "^4.3.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
