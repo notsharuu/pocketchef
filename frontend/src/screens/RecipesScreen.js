@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScrollView, View, Text, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const RECIPE_CATEGORY_FILTERS = ['All', 'Known Classic', 'Local Traditional', 'Quick Everyday'];
 
@@ -8,141 +9,149 @@ export default function RecipesScreen({
   styles,
   filteredRecipes,
   selectedRecipeCategory,
+  selectedCount = 0,
   onSelectRecipeCategory,
   onBackToInventory,
-  onStartNewScan,
   onSelectRecipe,
 }) {
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      <View style={[styles.resultsHeaderCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <View style={styles.resultsHeaderTopRow}>
+      {/* Header */}
+      <View style={{ gap: 4 }}>
+        <Text style={[styles.headlineLg, { color: theme.text }]}>Best Matches</Text>
+        <Text style={[styles.bodyMd, { color: theme.textMuted }]}>
+          Curated from your {selectedCount} {selectedCount === 1 ? 'ingredient' : 'ingredients'}.
+        </Text>
+      </View>
+
+      {/* Category Filter Pills */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8 }}
+      >
+        {RECIPE_CATEGORY_FILTERS.map((cat) => {
+          const isSelected = selectedRecipeCategory === cat;
+          return (
+            <TouchableOpacity
+              key={cat}
+              onPress={() => onSelectRecipeCategory(cat)}
+              activeOpacity={0.75}
+              style={[
+                styles.prefChip,
+                {
+                  backgroundColor: isSelected
+                    ? theme.secondaryContainer
+                    : theme.surfaceContainerLow,
+                  borderColor: isSelected ? theme.secondary : theme.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.labelSm,
+                  { color: isSelected ? theme.onSecondaryContainer : theme.text },
+                ]}
+              >
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Recipe Cards */}
+      {filteredRecipes.length === 0 ? (
+        <View
+          style={[
+            styles.progressCard,
+            {
+              backgroundColor: theme.surfaceContainerLow,
+              borderColor: theme.border,
+              alignItems: 'center',
+              paddingVertical: 28,
+            },
+          ]}
+        >
+          <MaterialIcons name="restaurant-menu" size={32} color={theme.textSubtle} />
+          <Text style={[styles.titleMd, { color: theme.text, textAlign: 'center' }]}>
+            No matching recipes found
+          </Text>
+          <Text style={[styles.bodyMd, { color: theme.textMuted, textAlign: 'center' }]}>
+            Try switching to "All" or adding a few staple spices in your inventory.
+          </Text>
           <TouchableOpacity
+            style={[
+              styles.pillOutlineBtn,
+              {
+                backgroundColor: theme.primary,
+                borderColor: theme.primary,
+                marginTop: 6,
+              },
+            ]}
             onPress={onBackToInventory}
-            style={[styles.backBtn, { backgroundColor: theme.cardAlt }]}
+            activeOpacity={0.85}
           >
-            <Text style={[styles.backBtnText, { color: theme.text }]}>&lt; Inventory</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={onStartNewScan}
-            style={[styles.resetBtn, { backgroundColor: theme.accent }]}
-          >
-            <Text style={[styles.resetBtnText, { color: theme.accentText }]}>New Scan</Text>
+            <Text style={[styles.labelSm, { color: theme.onPrimary }]}>Adjust Ingredients</Text>
           </TouchableOpacity>
         </View>
+      ) : (
+        <View style={{ gap: 12 }}>
+          {filteredRecipes.map((recipe, index) => {
+            const usedCount = recipe.ingredientsUsed?.length || 0;
+            const addCount = recipe.additionalIngredients?.length || 0;
+            const computedPct =
+              usedCount + addCount > 0
+                ? Math.max(40, Math.min(100, Math.round((usedCount / (usedCount + addCount)) * 100)))
+                : 80;
+            const matchPercent = recipe.matchPercent ?? computedPct;
+            const matchBadgeText = `${matchPercent}% match`;
+            const missingList = recipe.additionalIngredients?.length
+              ? recipe.additionalIngredients
+              : recipe.missingIngredients || [];
+            const kcal = recipe.nutrition?.calories;
+            const protein = recipe.nutrition?.proteinGrams;
 
-        <Text style={[styles.resultsTitle, { color: theme.text }]}>Indian Kitchen Recipes</Text>
-        <Text style={[styles.resultsSubtitle, { color: theme.textSubtle }]}>
-          Tap any dish to view full instructions &amp; voice cooking guide
-        </Text>
-
-        <View style={styles.categoryPillsRow}>
-          {RECIPE_CATEGORY_FILTERS.map((cat) => {
-            const isSelected = selectedRecipeCategory === cat;
             return (
               <TouchableOpacity
-                key={cat}
+                key={`recipe-${recipe.id || index}`}
+                onPress={() => onSelectRecipe(recipe)}
+                activeOpacity={0.82}
                 style={[
-                  styles.catPill,
-                  { backgroundColor: theme.cardAlt, borderColor: theme.borderStrong },
-                  isSelected && { backgroundColor: theme.accent, borderColor: theme.accent },
+                  styles.recipeCard,
+                  {
+                    backgroundColor: theme.surfaceContainerLowest,
+                    borderColor: theme.border,
+                  },
                 ]}
-                onPress={() => onSelectRecipeCategory(cat)}
               >
-                <Text
-                  style={[
-                    styles.catPillText,
-                    { color: theme.textMuted },
-                    isSelected && { color: theme.accentText, fontWeight: '700' },
-                  ]}
-                >
-                  {cat === 'Known Classic'
-                    ? '🥘 Classic'
-                    : cat === 'Local Traditional'
-                    ? '🏺 Traditional'
-                    : cat === 'Quick Everyday'
-                    ? '⚡ Quick'
-                    : 'All'}
-                </Text>
+                <View style={styles.sectionHeaderBetween}>
+                  <View style={[styles.matchBadgePill, { backgroundColor: theme.secondaryContainer }]}>
+                    <Text style={[styles.labelSm, { color: theme.onSecondaryContainer }]}>
+                      {matchBadgeText}
+                    </Text>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={20} color={theme.textSubtle} />
+                </View>
+
+                <View style={{ gap: 4 }}>
+                  <Text style={[styles.headlineMd, { color: theme.text }]}>{recipe.title}</Text>
+                  <Text style={[styles.bodyMd, { color: theme.textMuted }]}>
+                    {recipe.region || recipe.cuisine || 'Indian'} • {recipe.cookTimeMinutes || 20}{' '}
+                    min
+                    {kcal != null ? ` • ${kcal} kcal` : ''}
+                    {protein != null ? ` • ${protein}g protein` : ''}
+                  </Text>
+                  {missingList.length > 0 && (
+                    <Text style={[styles.labelSm, { color: theme.primary, marginTop: 2 }]}>
+                      Optional add-on: {missingList.slice(0, 3).join(', ')}
+                    </Text>
+                  )}
+                </View>
               </TouchableOpacity>
             );
           })}
         </View>
-      </View>
-
-      {filteredRecipes.length === 0 ? (
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.emptyText, { color: theme.textSubtle }]}>
-            No recipes matched the "{selectedRecipeCategory}" category in this batch. Tap "All" above to view all generated recipes.
-          </Text>
-        </View>
-      ) : (
-        filteredRecipes.map((recipe, index) => {
-          const isTraditional = recipe.category === 'Local Traditional';
-          const isQuick = recipe.category === 'Quick Everyday';
-
-          return (
-            <TouchableOpacity
-              key={`recipe-${recipe.id || index}`}
-              style={[styles.recipeCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-              onPress={() => onSelectRecipe(recipe)}
-              activeOpacity={0.82}
-            >
-              <View style={styles.recipeMetaRow}>
-                <View
-                  style={[
-                    styles.recipeCategoryBadge,
-                    isTraditional
-                      ? styles.catBadgeTraditional
-                      : isQuick
-                      ? styles.catBadgeQuick
-                      : styles.catBadgeClassic,
-                  ]}
-                >
-                  <Text style={styles.recipeCategoryText}>
-                    {isTraditional
-                      ? '🏺 Local Traditional'
-                      : isQuick
-                      ? '⚡ Quick Everyday'
-                      : '🥘 Known Classic'}
-                  </Text>
-                </View>
-                <Text style={[styles.recipeRegionText, { color: theme.textSubtle }]}>
-                  {recipe.region || 'Indian'}
-                </Text>
-              </View>
-
-              <Text style={[styles.recipeTitle, { color: theme.text }]}>{recipe.title}</Text>
-              <Text style={[styles.recipeDescription, { color: theme.textMuted }]}>
-                {recipe.description}
-              </Text>
-
-              {recipe.nutrition && (
-                <View
-                  style={[
-                    styles.nutritionQuickRow,
-                    { backgroundColor: theme.cardAlt, borderColor: theme.border },
-                  ]}
-                >
-                  <Text style={[styles.nutritionQuickText, { color: theme.text }]}>
-                    {recipe.nutrition.calories} kcal • {recipe.nutrition.proteinGrams}g protein •{' '}
-                    {recipe.nutrition.carbsGrams}g carbs • {recipe.nutrition.fatGrams}g fat
-                  </Text>
-                </View>
-              )}
-
-              <View style={styles.recipeQuickStatsRow}>
-                <Text style={[styles.quickStatText, { color: theme.textSubtle }]}>
-                  ⏱ {recipe.cookTimeMinutes || 20} mins
-                </Text>
-                <Text style={[styles.quickStatText, { color: theme.textSubtle }]}>
-                  • {recipe.difficulty || 'Easy'}
-                </Text>
-                <Text style={[styles.expandHintText, { color: theme.text }]}>View Recipe &gt;</Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })
       )}
     </ScrollView>
   );

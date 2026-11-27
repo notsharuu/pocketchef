@@ -151,20 +151,46 @@ export function estimateRecipeNutrition({ title = '', ingredients = [], course =
   let totalFat = 0;
   let matchedCount = 0;
   const seenKeys = new Set();
+  const rawBreakdown = [];
 
-  const textPool = [...ingList.map((i) => String(i || '').toLowerCase()), String(title || '').toLowerCase()];
+  const textPool = [
+    ...ingList.map((i) => ({ label: String(i || '').trim(), lower: String(i || '').toLowerCase() })),
+    { label: String(title || '').trim(), lower: String(title || '').toLowerCase(), isTitleFallback: true },
+  ];
 
   for (const entry of textPool) {
     for (const key of SORTED_NUTRITION_KEYS) {
-      if (!seenKeys.has(key) && entry.includes(key)) {
+      if (!seenKeys.has(key) && entry.lower.includes(key)) {
         seenKeys.add(key);
         const [kcal100, prot100, carb100, fat100, defaultGrams] = INGREDIENT_NUTRITION_DB[key];
         const factor = defaultGrams / 100;
-        totalKcal += kcal100 * factor;
-        totalProtein += prot100 * factor;
-        totalCarbs += carb100 * factor;
-        totalFat += fat100 * factor;
+        const kcal = kcal100 * factor;
+        const protein = prot100 * factor;
+        const carbs = carb100 * factor;
+        const fat = fat100 * factor;
+        const fiber = Math.max(0, Math.round(carbs * 0.18 * 10) / 10);
+
+        totalKcal += kcal;
+        totalProtein += protein;
+        totalCarbs += carbs;
+        totalFat += fat;
         matchedCount++;
+
+        const displayName = entry.isTitleFallback
+          ? key.replace(/\b\w/g, (c) => c.toUpperCase())
+          : entry.label || key.replace(/\b\w/g, (c) => c.toUpperCase());
+
+        rawBreakdown.push({
+          id: `ing-${rawBreakdown.length}-${key.replace(/\s+/g, '-')}`,
+          name: displayName,
+          gramsPerServing: defaultGrams,
+          kcal,
+          protein,
+          carbs,
+          fat,
+          fiber,
+          prepNote: `IFCT estimate based on ~${defaultGrams}g per serving.`,
+        });
         break;
       }
     }
@@ -173,6 +199,17 @@ export function estimateRecipeNutrition({ title = '', ingredients = [], course =
   // Ensure cooking oil baseline if no explicit fat source was matched
   if (!seenKeys.has('oil') && !seenKeys.has('ghee') && !seenKeys.has('butter') && !seenKeys.has('mustard oil') && !seenKeys.has('olive oil')) {
     totalFat += 7;
+    rawBreakdown.push({
+      id: 'ing-cooking-oil',
+      name: 'Cooking Oil / Ghee',
+      gramsPerServing: 7,
+      kcal: 63,
+      protein: 0,
+      carbs: 0,
+      fat: 7,
+      fiber: 0,
+      prepNote: 'Standard cooking fat baseline (~7g per serving).',
+    });
   }
 
   // Fallback baseline if recipe has sparse/unlisted ingredients
@@ -180,12 +217,39 @@ export function estimateRecipeNutrition({ title = '', ingredients = [], course =
     const isNonVeg = /non[\s-]*veget/i.test(diet || '') || /chicken|mutton|fish|egg/i.test(title);
     const isDessert = /dessert|sweet/i.test(course || '');
     if (isDessert) {
-      return { calories: 290, proteinGrams: 5, carbsGrams: 42, fatGrams: 11, perServing: true, estimated: true };
+      return {
+        calories: 290,
+        proteinGrams: 5,
+        carbsGrams: 42,
+        fatGrams: 11,
+        fiberGrams: 2,
+        ingredientsBreakdown: rawBreakdown,
+        perServing: true,
+        estimated: true,
+      };
     }
     if (isNonVeg) {
-      return { calories: 325, proteinGrams: 24, carbsGrams: 14, fatGrams: 19, perServing: true, estimated: true };
+      return {
+        calories: 325,
+        proteinGrams: 24,
+        carbsGrams: 14,
+        fatGrams: 19,
+        fiberGrams: 2,
+        ingredientsBreakdown: rawBreakdown,
+        perServing: true,
+        estimated: true,
+      };
     }
-    return { calories: 245, proteinGrams: 9, carbsGrams: 30, fatGrams: 10, perServing: true, estimated: true };
+    return {
+      calories: 245,
+      proteinGrams: 9,
+      carbsGrams: 30,
+      fatGrams: 10,
+      fiberGrams: 4,
+      ingredientsBreakdown: rawBreakdown,
+      perServing: true,
+      estimated: true,
+    };
   }
 
   // Scale down gently if many dense ingredients matched (multi-ingredient thali/curry)
@@ -196,16 +260,29 @@ export function estimateRecipeNutrition({ title = '', ingredients = [], course =
   const proteinGrams = Math.max(1, Math.round(totalProtein * courseScale));
   const carbsGrams = Math.max(2, Math.round(totalCarbs * courseScale));
   const fatGrams = Math.max(1, Math.round(totalFat * courseScale));
+  const fiberGrams = Math.max(1, Math.round(carbsGrams * 0.18));
 
   // Derive calories via Atwater factors (4*P + 4*C + 9*F) so kcal always matches displayed macros
   const rawCalories = proteinGrams * 4 + carbsGrams * 4 + fatGrams * 9;
   const calories = Math.min(820, Math.max(60, Math.round(rawCalories / 5) * 5));
+
+  const ingredientsBreakdown = rawBreakdown.map((item) => ({
+    ...item,
+    gramsPerServing: Math.max(1, Math.round(item.gramsPerServing * courseScale)),
+    kcal: Math.round(item.kcal * courseScale),
+    protein: Math.round(item.protein * courseScale * 10) / 10,
+    carbs: Math.round(item.carbs * courseScale * 10) / 10,
+    fat: Math.round(item.fat * courseScale * 10) / 10,
+    fiber: Math.round(item.fiber * courseScale * 10) / 10,
+  }));
 
   return {
     calories,
     proteinGrams,
     carbsGrams,
     fatGrams,
+    fiberGrams,
+    ingredientsBreakdown,
     perServing: true,
     estimated: true,
   };

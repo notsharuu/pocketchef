@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, Animated } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function CaptureScreen({
   theme,
@@ -7,125 +8,250 @@ export default function CaptureScreen({
   isScanning,
   stagedPhotos,
   progressWidth,
+  scanStageIndex = 0,
   scanStageText,
   onAddFromCamera,
   onAddFromGallery,
   onOpenManualInventory,
-  onClearAllStaged,
   onRemovePhotoAtIndex,
   onScanSubmit,
 }) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const canScan = stagedPhotos.length > 0 && !isScanning;
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      {!isScanning && (
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Scan Whole Fridge</Text>
-          <Text style={[styles.cardSubtitle, { color: theme.textSubtle }]}>
-            Take or select photos of different shelves, crisper drawers, or door racks to build your kitchen inventory.
+      {/* Hero Prompt */}
+      <View style={{ gap: 4 }}>
+        <Text style={[styles.heroHeadline, { color: theme.text }]}>What’s in your fridge?</Text>
+        <Text style={[styles.bodyMd, { color: theme.textMuted }]}>
+          Pick 1–8 photos from your library or camera to discover Indian recipes.
+        </Text>
+      </View>
+
+      {/* Dashed Photo Picker Card */}
+      <View
+        style={[
+          styles.dropZoneCard,
+          {
+            backgroundColor: theme.surfaceContainerLow,
+            borderColor: theme.borderStrong,
+          },
+        ]}
+      >
+        <View style={[styles.dropZoneIconCircle, { backgroundColor: theme.primaryContainer }]}>
+          <MaterialIcons name="photo-library" size={24} color={theme.onPrimaryContainer} />
+        </View>
+
+        <View style={{ alignItems: 'center', gap: 4, maxWidth: 260 }}>
+          <Text style={[styles.titleMd, { color: theme.text, textAlign: 'center' }]}>
+            Choose from Photos
           </Text>
+          <Text style={[styles.bodyMd, { color: theme.textMuted, textAlign: 'center' }]}>
+            Select fridge shelves, crisper, or pantry shots.
+          </Text>
+        </View>
 
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.btn, { backgroundColor: theme.accent }]}
-              onPress={onAddFromCamera}
-            >
-              <Text style={[styles.btnPrimaryText, { color: theme.accentText }]}>Add Shelf Photo</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.btn,
-                styles.btnSecondary,
-                { backgroundColor: theme.cardAlt, borderColor: theme.borderStrong },
-              ]}
-              onPress={onAddFromGallery}
-            >
-              <Text style={[styles.btnSecondaryText, { color: theme.textMuted }]}>Select Multiple</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.dropZoneBtnRow}>
+          <TouchableOpacity
+            style={[
+              styles.pillOutlineBtn,
+              {
+                backgroundColor: theme.surfaceContainerLowest,
+                borderColor: theme.border,
+                opacity: isScanning || stagedPhotos.length >= 8 ? 0.5 : 1,
+              },
+            ]}
+            onPress={onAddFromCamera}
+            disabled={isScanning || stagedPhotos.length >= 8}
+            activeOpacity={0.75}
+          >
+            <MaterialIcons name="photo-camera" size={16} color={theme.text} />
+            <Text style={[styles.labelSm, { color: theme.text }]}>Take Photo</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.manualEntryLink}
-            onPress={onOpenManualInventory}
-            activeOpacity={0.7}
+            style={[
+              styles.pillOutlineBtn,
+              {
+                backgroundColor: theme.surfaceContainerLowest,
+                borderColor: theme.border,
+                opacity: isScanning || stagedPhotos.length >= 8 ? 0.5 : 1,
+              },
+            ]}
+            onPress={onAddFromGallery}
+            disabled={isScanning || stagedPhotos.length >= 8}
+            activeOpacity={0.75}
           >
-            <Text style={[styles.manualEntryLinkText, { color: theme.textMuted }]}>
-              Or type ingredients manually &gt;
-            </Text>
+            <MaterialIcons name="collections" size={16} color={theme.primary} />
+            <Text style={[styles.labelSm, { color: theme.primary }]}>Browse Library</Text>
           </TouchableOpacity>
         </View>
-      )}
+      </View>
 
-      {stagedPhotos.length > 0 && (
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.stagingHeaderRow}>
-            <Text style={[styles.cardTitle, { color: theme.text }]}>
-              Selected Photos ({stagedPhotos.length}/8)
-            </Text>
-            {!isScanning && (
-              <TouchableOpacity onPress={onClearAllStaged}>
-                <Text style={styles.dangerLinkText}>Clear All</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+      {/* Selected Photos Grid */}
+      <View style={{ gap: 10 }}>
+        <View style={styles.sectionHeaderBetween}>
+          <Text style={[styles.labelLg, { color: theme.text }]}>Selected Photos</Text>
+          <Text style={[styles.monoText, { color: theme.textMuted }]}>
+            {stagedPhotos.length} / 8
+          </Text>
+        </View>
 
-          <View style={styles.thumbnailGrid}>
-            {stagedPhotos.map((photo, index) => (
-              <View
+        <View style={styles.photoGrid4}>
+          {stagedPhotos.map((photo, index) => {
+            const isActive = index === selectedIndex;
+            return (
+              <TouchableOpacity
                 key={`photo-${index}`}
-                style={[styles.thumbnailWrapper, { borderColor: theme.border }]}
+                onPress={() => setSelectedIndex(index)}
+                activeOpacity={0.85}
+                style={[
+                  styles.photoTile,
+                  {
+                    backgroundColor: theme.surfaceContainer,
+                    borderWidth: isActive ? 2 : 1,
+                    borderColor: isActive ? theme.saffronOrange : theme.border,
+                  },
+                ]}
               >
-                <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
-                <View style={styles.shelfTagBadge}>
-                  <Text style={styles.shelfTagText}>Shelf #{index + 1}</Text>
-                </View>
+                <Image source={{ uri: photo.uri }} style={styles.photoTileImg} />
                 {!isScanning && (
                   <TouchableOpacity
-                    style={styles.deleteBadge}
+                    style={styles.photoRemoveBtn}
                     onPress={() => onRemovePhotoAtIndex(index)}
+                    accessibilityLabel={`Remove photo ${index + 1}`}
                   >
-                    <Text style={styles.deleteBadgeText}>x</Text>
+                    <MaterialIcons name="close" size={14} color="#FFFFFF" />
                   </TouchableOpacity>
                 )}
-              </View>
-            ))}
-          </View>
-
-          {isScanning ? (
-            <View style={styles.loadingContainer}>
-              <View style={styles.loadingHeaderRow}>
-                <Text style={[styles.loadingTitle, { color: theme.text }]}>
-                  Analyzing {stagedPhotos.length} {stagedPhotos.length === 1 ? 'photo' : 'photos'}
-                </Text>
-                <Text style={[styles.loadingModelLabel, { color: theme.textSubtle }]}>
-                  PocketChef Vision
-                </Text>
-              </View>
-
-              <View style={[styles.progressBarTrack, { backgroundColor: theme.border }]}>
-                <Animated.View
-                  style={[styles.progressBarFill, { width: progressWidth, backgroundColor: theme.accent }]}
-                />
-              </View>
-
-              <Text style={[styles.loadingStageText, { color: theme.textMuted }]}>{scanStageText}</Text>
-            </View>
-          ) : (
-            <View style={styles.actionContainer}>
-              <TouchableOpacity
-                style={[styles.btn, styles.btnScan, { backgroundColor: theme.accent }]}
-                onPress={onScanSubmit}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.btnScanText, { color: theme.accentText }]}>
-                  Scan Entire Fridge ({stagedPhotos.length}{' '}
-                  {stagedPhotos.length === 1 ? 'Photo' : 'Photos'})
-                </Text>
               </TouchableOpacity>
-            </View>
+            );
+          })}
+
+          {stagedPhotos.length < 8 && (
+            <TouchableOpacity
+              onPress={onAddFromGallery}
+              disabled={isScanning}
+              activeOpacity={0.75}
+              style={[
+                styles.photoAddTile,
+                {
+                  backgroundColor: theme.surfaceContainerLow,
+                  borderColor: theme.borderStrong,
+                  opacity: isScanning ? 0.5 : 1,
+                },
+              ]}
+            >
+              <MaterialIcons name="add-photo-alternate" size={22} color={theme.textMuted} />
+              <Text style={[styles.labelSm, { color: theme.textMuted }]}>Add</Text>
+            </TouchableOpacity>
           )}
         </View>
+      </View>
+
+      {/* Multi-Stage AI Scanning Card */}
+      {isScanning && (
+        <View
+          style={[
+            styles.progressCard,
+            {
+              backgroundColor: theme.surfaceContainerLowest,
+              borderColor: theme.saffronOrange,
+            },
+          ]}
+        >
+          <View style={styles.sectionHeaderBetween}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <MaterialIcons name="auto-awesome" size={18} color={theme.saffronOrange} />
+              <Text style={[styles.titleMd, { color: theme.text }]}>Scanning your photos…</Text>
+            </View>
+            <Text style={[styles.monoText, { color: theme.primary }]}>PocketChef AI</Text>
+          </View>
+
+          <View style={[styles.progressTrack, { backgroundColor: theme.surfaceContainerHigh }]}>
+            <Animated.View
+              style={[
+                styles.progressFill,
+                { width: progressWidth, backgroundColor: theme.saffronOrange },
+              ]}
+            />
+          </View>
+
+          <View style={{ gap: 6 }}>
+            {[
+              'Reading selected photos',
+              'Analyzing detected veggies & dairy…',
+              'Formulating ingredient list',
+            ].map((label, idx) => {
+              const done = scanStageIndex > idx;
+              const current = scanStageIndex === idx;
+              return (
+                <View key={label} style={styles.stageRow}>
+                  <MaterialIcons
+                    name={done ? 'check-circle' : current ? 'radio-button-checked' : 'schedule'}
+                    size={17}
+                    color={
+                      done
+                        ? theme.secondary
+                        : current
+                        ? theme.saffronOrange
+                        : theme.textSubtle
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.bodyMd,
+                      {
+                        color: done
+                          ? theme.secondary
+                          : current
+                          ? theme.text
+                          : theme.textSubtle,
+                        fontWeight: current ? '600' : '400',
+                      },
+                    ]}
+                  >
+                    {idx === 1 && current && scanStageText ? scanStageText : label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
       )}
+
+      {/* Primary CTA + Manual Entry Link */}
+      <View style={{ gap: 8 }}>
+        <TouchableOpacity
+          style={[
+            styles.primaryPillBtn,
+            {
+              backgroundColor: theme.primary,
+              opacity: canScan ? 1 : 0.45,
+            },
+          ]}
+          onPress={onScanSubmit}
+          disabled={!canScan}
+          activeOpacity={0.85}
+        >
+          <MaterialIcons name="auto-awesome" size={20} color={theme.onPrimary} />
+          <Text style={[styles.primaryPillBtnText, { color: theme.onPrimary }]}>
+            {isScanning ? 'Scanning Ingredients…' : 'Scan Ingredients'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.linkBtnCenter}
+          onPress={onOpenManualInventory}
+          disabled={isScanning}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.labelSm, { color: theme.textMuted }]}>
+            Or enter ingredients manually
+          </Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }

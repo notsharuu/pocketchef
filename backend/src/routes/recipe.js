@@ -5,6 +5,7 @@ import {
   getVectorDbStats,
   searchRecipesByVector,
 } from '../services/vectorDb.js';
+import { findRecipeYouTubeVideo } from '../services/youtube.js';
 
 const router = Router();
 
@@ -34,6 +35,22 @@ router.get('/recipes/search', async (req, res, next) => {
   } catch (err) {
     return next(err);
   }
+});
+
+/**
+ * GET /api/recipes/video?title=...&cuisine=...
+ * Looks up an embeddable YouTube cooking tutorial video for a recipe.
+ */
+router.get('/recipes/video', async (req, res) => {
+  const title = typeof req.query.title === 'string' ? req.query.title.trim() : '';
+  const cuisine = typeof req.query.cuisine === 'string' ? req.query.cuisine.trim() : '';
+
+  if (!title) {
+    return res.status(400).json({ error: 'Query parameter "title" is required' });
+  }
+
+  const video = await findRecipeYouTubeVideo({ title, cuisine });
+  return res.status(200).json(video);
 });
 
 /**

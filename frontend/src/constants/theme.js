@@ -1,59 +1,123 @@
 export const DEFAULT_BACKEND_URL = 'http://192.168.1.3:3001';
 
 export const LIGHT_THEME = {
-  bg: '#f8fafc',
-  card: '#ffffff',
-  cardAlt: '#f1f5f9',
-  border: '#e2e8f0',
-  borderStrong: '#cbd5e1',
-  text: '#0f172a',
-  textMuted: '#475569',
-  textSubtle: '#64748b',
-  accent: '#0f172a',
-  accentText: '#ffffff',
-  highlightBg: '#fde047',
-  highlightText: '#0f172a',
-  glowText: '#b45309',
-  glowShadow: 'rgba(245, 158, 11, 0.75)',
-  stepActiveBg: '#f1f5f9',
-  badgeSeen: '#dcfce7',
-  badgeMaybe: '#fef3c7',
-  badgeText: '#0f172a',
+  isDark: false,
+  saffronOrange: '#E8590C',
+  tangerineOrange: '#F76707',
+  herbGreen: '#2F9E44',
+  freshGreen: '#40C057',
+
+  bg: '#FCFAF7',
+  surface: '#FCFAF7',
+  surfaceContainerLow: '#F6F3EE',
+  surfaceContainer: '#EFECE6',
+  surfaceContainerHigh: '#E7E3DC',
+  surfaceContainerLowest: '#FFFFFF',
+
+  card: '#FFFFFF',
+  cardAlt: '#F6F3EE',
+  border: '#E2CFC7',
+  borderStrong: '#8E7166',
+
+  primary: '#A23A00',
+  onPrimary: '#FFFFFF',
+  primaryContainer: '#FFDBCE',
+  onPrimaryContainer: '#370E00',
+
+  secondary: '#006E24',
+  onSecondary: '#FFFFFF',
+  secondaryContainer: '#C7FFC3',
+  onSecondaryContainer: '#002106',
+
+  text: '#1A1B1E',
+  textMuted: '#5A4138',
+  textSubtle: '#8E7166',
+
+  accent: '#A23A00',
+  accentText: '#FFFFFF',
+
+  inverseSurface: '#2F3033',
+  inverseOnSurface: '#F2F0F4',
+
+  error: '#BA1A1A',
+  errorContainer: '#FFDAD6',
+  onErrorContainer: '#410002',
+
+  highlightBg: '#FFDBCE',
+  highlightText: '#370E00',
+  glowText: '#E8590C',
+  glowShadow: 'rgba(232, 89, 12, 0.45)',
+  stepActiveBg: '#FFFFFF',
+  badgeSeen: '#C7FFC3',
+  badgeMaybe: '#FFDBCE',
+  badgeText: '#1A1B1E',
 };
 
 export const DARK_THEME = {
-  bg: '#090d16',
-  card: '#111827',
-  cardAlt: '#1e293b',
-  border: '#1f2937',
-  borderStrong: '#334155',
-  text: '#f8fafc',
-  textMuted: '#cbd5e1',
-  textSubtle: '#94a3b8',
-  accent: '#f8fafc',
-  accentText: '#0f172a',
-  highlightBg: '#f59e0b',
-  highlightText: '#090d16',
-  glowText: '#fde047',
-  glowShadow: 'rgba(250, 204, 21, 0.9)',
-  stepActiveBg: '#1e293b',
-  badgeSeen: '#14532d',
-  badgeMaybe: '#78350f',
-  badgeText: '#f8fafc',
+  isDark: true,
+  saffronOrange: '#E8590C',
+  tangerineOrange: '#F76707',
+  herbGreen: '#2F9E44',
+  freshGreen: '#40C057',
+
+  bg: '#121316',
+  surface: '#121316',
+  surfaceContainerLow: '#1A1B1E',
+  surfaceContainer: '#222327',
+  surfaceContainerHigh: '#2B2C31',
+  surfaceContainerLowest: '#0D0E11',
+
+  card: '#222327',
+  cardAlt: '#1A1B1E',
+  border: '#3D3A39',
+  borderStrong: '#A98A7E',
+
+  primary: '#FFB598',
+  onPrimary: '#591C00',
+  primaryContainer: '#7F2B00',
+  onPrimaryContainer: '#FFDBCE',
+
+  secondary: '#71DD7A',
+  onSecondary: '#00390F',
+  secondaryContainer: '#005319',
+  onSecondaryContainer: '#C7FFC3',
+
+  text: '#E3E2E6',
+  textMuted: '#E2BFB2',
+  textSubtle: '#A98A7E',
+
+  accent: '#FFB598',
+  accentText: '#591C00',
+
+  inverseSurface: '#2B2C31',
+  inverseOnSurface: '#E3E2E6',
+
+  error: '#FFB4AB',
+  errorContainer: '#93000A',
+  onErrorContainer: '#FFDAD6',
+
+  highlightBg: '#7F2B00',
+  highlightText: '#FFDBCE',
+  glowText: '#FFB598',
+  glowShadow: 'rgba(255, 181, 152, 0.55)',
+  stepActiveBg: '#222327',
+  badgeSeen: '#005319',
+  badgeMaybe: '#7F2B00',
+  badgeText: '#E3E2E6',
 };
 
 export const SCAN_STAGES = [
-  'Uploading shelf photos to server...',
-  'Scanning vegetables, produce & spices across shelves...',
-  'Cataloging closed steel dabbas & packaging...',
-  'Synthesizing unified whole-fridge inventory...',
+  'Reading selected photos...',
+  'Analyzing detected veggies & dairy...',
+  'Checking spice jars & pantry staples...',
+  'Formulating ingredient list...',
 ];
 
 export const RECIPE_STAGES = [
   'Analyzing selected fridge ingredients...',
   'Consulting regional Indian culinary archives...',
-  'Balancing known classics & deep rural traditional recipes...',
-  'Formulating step-by-step cooking techniques & chef secrets...',
+  'Matching classics & regional dishes...',
+  'Calculating nutrition & cooking steps...',
 ];
 
 export const DEFAULT_DB_CATEGORIES = {

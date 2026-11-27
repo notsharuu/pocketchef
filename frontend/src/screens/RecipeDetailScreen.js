@@ -1,9 +1,21 @@
-import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  ScrollView,
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  Linking,
+  ActivityIndicator,
+} from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
+import { fetchRecipeVideo } from '../services/api';
 
 export default function RecipeDetailScreen({
   theme,
   styles,
+  backendUrl,
   selectedRecipe,
   supportedLanguages,
   speechLanguage,
@@ -12,310 +24,568 @@ export default function RecipeDetailScreen({
   activeWordIndex,
   isSpeaking,
   isPreparingSpeech,
-  onBackToRecipes,
-  onStartNewScan,
   onSelectLanguage,
   onSpeakStep,
   onStopDictation,
+  onOpenNutrition,
 }) {
+  const [checkedIngredients, setCheckedIngredients] = useState({});
+  const [isLangModalOpen, setIsLangModalOpen] = useState(false);
+  const [videoInfo, setVideoInfo] = useState(null);
+  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+
   const recipeKey = selectedRecipe.id || selectedRecipe.title;
   const isCurrentRecipeSpeech = activeSpeechState?.recipeId === recipeKey;
+  const currentStepIdx = isCurrentRecipeSpeech ? activeSpeechState?.stepIndex ?? 0 : 0;
+  const steps = selectedRecipe.steps || [];
+
+  const activeLangObj =
+    supportedLanguages.find((l) => l.code === speechLanguage) || supportedLanguages[0];
+
+  // Build combined checkable ingredients list
+  const usedList = translatedIngredients?.used || selectedRecipe.ingredientsUsed || [];
+  const additionalList =
+    translatedIngredients?.additional || selectedRecipe.additionalIngredients || [];
+  const pantryList = translatedIngredients?.pantry || selectedRecipe.missingIngredients || [];
+  const allIngredients = [
+    ...usedList.map((name, i) => ({ id: `used-${i}`, name, tag: 'In fridge' })),
+    ...additionalList.map((name, i) => ({ id: `add-${i}`, name, tag: 'Needed' })),
+    ...pantryList.map((name, i) => ({ id: `pantry-${i}`, name, tag: 'Pantry' })),
+  ];
+
+  // Pre-tick ingredients that are already in the fridge whenever the recipe changes
+  useEffect(() => {
+    const initialChecked = {};
+    (selectedRecipe.ingredientsUsed || []).forEach((_, i) => {
+      initialChecked[`used-${i}`] = true;
+    });
+    setCheckedIngredients(initialChecked);
+  }, [selectedRecipe.id, selectedRecipe.title]);
+
+  // Fetch embedded YouTube cooking tutorial for this recipe
+  useEffect(() => {
+    const controller = new AbortController();
+    setVideoInfo(null);
+    setIsLoadingVideo(true);
+
+    fetchRecipeVideo(
+      backendUrl,
+      {
+        title: selectedRecipe.title,
+        cuisine: selectedRecipe.region || selectedRecipe.cuisine || '',
+      },
+      controller.signal
+    )
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setVideoInfo(data?.available ? data : null);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setVideoInfo(null);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsLoadingVideo(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [backendUrl, selectedRecipe.title, selectedRecipe.region, selectedRecipe.cuisine]);
+
+  const toggleIngredient = (id) => {
+    setCheckedIngredients((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleTogglePlay = () => {
+    if (isCurrentRecipeSpeech && (isSpeaking || isPreparingSpeech)) {
+      onStopDictation();
+    } else if (steps.length > 0) {
+      onSpeakStep(selectedRecipe, currentStepIdx);
+    }
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      <View style={[styles.resultsHeaderCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <View style={styles.resultsHeaderTopRow}>
-          <TouchableOpacity
-            onPress={onBackToRecipes}
-            style={[styles.backBtn, { backgroundColor: theme.cardAlt }]}
-          >
-            <Text style={[styles.backBtnText, { color: theme.text }]}>&lt; All Recipes</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={onStartNewScan}
-            style={[styles.resetBtn, { backgroundColor: theme.accent }]}
-          >
-            <Text style={[styles.resetBtnText, { color: theme.accentText }]}>New Scan</Text>
-          </TouchableOpacity>
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContentWithSticky}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Title & Metadata */}
+        <View style={{ gap: 6 }}>
+          <Text style={[styles.heroHeadline, { color: theme.text }]}>{selectedRecipe.title}</Text>
+          <Text style={[styles.bodyMd, { color: theme.textMuted }]}>
+            {selectedRecipe.region || selectedRecipe.cuisine || 'Indian'} •{' '}
+            {selectedRecipe.cookTimeMinutes || 20} min
+            {selectedRecipe.nutrition?.calories != null
+              ? ` • ${selectedRecipe.nutrition.calories} kcal`
+              : ''}
+            {selectedRecipe.nutrition?.proteinGrams != null
+              ? ` • ${selectedRecipe.nutrition.proteinGrams}g protein`
+              : ''}
+          </Text>
+          {selectedRecipe.description ? (
+            <Text style={[styles.bodyMd, { color: theme.textMuted }]}>
+              {selectedRecipe.description}
+            </Text>
+          ) : null}
         </View>
 
-        <View style={styles.recipeMetaRow}>
+        {/* Embedded YouTube Recipe Video */}
+        {isLoadingVideo ? (
           <View
             style={[
-              styles.recipeCategoryBadge,
-              selectedRecipe.category === 'Local Traditional'
-                ? styles.catBadgeTraditional
-                : selectedRecipe.category === 'Quick Everyday'
-                ? styles.catBadgeQuick
-                : styles.catBadgeClassic,
+              styles.videoCard,
+              {
+                backgroundColor: theme.surfaceContainerLow,
+                borderColor: theme.border,
+                padding: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+              },
             ]}
           >
-            <Text style={styles.recipeCategoryText}>
-              {selectedRecipe.category === 'Local Traditional'
-                ? '🏺 Local Traditional'
-                : selectedRecipe.category === 'Quick Everyday'
-                ? '⚡ Quick Everyday'
-                : '🥘 Known Classic'}
+            <ActivityIndicator size="small" color={theme.saffronOrange} />
+            <Text style={[styles.labelSm, { color: theme.textMuted }]}>
+              Finding YouTube cooking video…
             </Text>
           </View>
-          <Text style={[styles.recipeRegionText, { color: theme.textSubtle }]}>
-            {selectedRecipe.region || 'Indian'}
-          </Text>
-        </View>
-
-        <Text style={[styles.resultsTitle, { color: theme.text }]}>{selectedRecipe.title}</Text>
-        <Text style={[styles.recipeDescription, { color: theme.textMuted }]}>
-          {selectedRecipe.description}
-        </Text>
-
-        <View style={styles.recipeQuickStatsRow}>
-          <Text style={[styles.quickStatText, { color: theme.textSubtle }]}>
-            ⏱ {selectedRecipe.cookTimeMinutes || 20} mins
-          </Text>
-          <Text style={[styles.quickStatText, { color: theme.textSubtle }]}>
-            • {selectedRecipe.difficulty || 'Easy'}
-          </Text>
-        </View>
-
-        {/* Voice Guide Language Selector */}
-        <View style={styles.langBarHeaderRow}>
-          <Text style={[styles.langBarLabel, { color: theme.text }]}>Voice Guide Language</Text>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.langScrollRow}
-        >
-          {supportedLanguages.map((lang) => {
-            const isLangActive = speechLanguage === lang.code;
-            return (
-              <TouchableOpacity
-                key={lang.code}
-                style={[
-                  styles.langPill,
-                  { backgroundColor: theme.cardAlt, borderColor: theme.borderStrong },
-                  isLangActive && { backgroundColor: theme.accent, borderColor: theme.accent },
-                ]}
-                onPress={() => onSelectLanguage(lang.code)}
-              >
+        ) : videoInfo?.embedUrl ? (
+          <View
+            style={[
+              styles.videoCard,
+              {
+                backgroundColor: theme.surfaceContainerLowest,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <View style={styles.videoPlayerBox}>
+              <WebView
+                source={{
+                  baseUrl: 'https://pocketchef.app',
+                  html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden}iframe{width:100%;height:100%;border:0}</style></head><body><iframe src="https://www.youtube-nocookie.com/embed/${videoInfo.videoId}?playsinline=1&rel=0&modestbranding=1&origin=https://pocketchef.app" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></body></html>`,
+                }}
+                userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+                originWhitelist={['*']}
+                style={{ flex: 1, backgroundColor: '#000000' }}
+                allowsFullscreenVideo
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+                javaScriptEnabled
+                domStorageEnabled
+              />
+            </View>
+            <View style={styles.videoMetaRow}>
+              <View style={{ flex: 1, gap: 2 }}>
                 <Text
-                  style={[
-                    styles.langPillText,
-                    { color: theme.textMuted },
-                    isLangActive && { color: theme.accentText, fontWeight: '700' },
-                  ]}
+                  style={[styles.labelLg, { color: theme.text }]}
+                  numberOfLines={1}
                 >
-                  {lang.code === 'en' ? 'English' : `${lang.label} (${lang.nativeLabel})`}
+                  {videoInfo.title}
                 </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+                <Text style={[styles.labelSm, { color: theme.textMuted }]} numberOfLines={1}>
+                  {videoInfo.channelTitle} • Video Guide
+                </Text>
+              </View>
+              {videoInfo.watchUrl ? (
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(videoInfo.watchUrl)}
+                  style={[
+                    styles.langSelectorPill,
+                    {
+                      backgroundColor: theme.surfaceContainerLow,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  activeOpacity={0.75}
+                >
+                  <MaterialIcons name="open-in-new" size={14} color={theme.primary} />
+                  <Text style={[styles.labelSm, { color: theme.primary }]}>YouTube</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
 
-      {/* Nutrition Breakdown Card */}
-      {selectedRecipe.nutrition && (
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.nutritionBoxTitle, { color: theme.textSubtle }]}>
-            Estimated Nutrition (Per Serving)
-          </Text>
-          <View style={styles.nutritionGrid}>
+        {/* Estimated Nutrition Bar (Tap to open detailed Nutrition screen) */}
+        {selectedRecipe.nutrition && (
+          <TouchableOpacity
+            onPress={onOpenNutrition}
+            activeOpacity={0.78}
+            accessibilityLabel="Open detailed nutritional values"
+            style={[
+              styles.nutritionBarCard,
+              {
+                backgroundColor: theme.surfaceContainerLowest,
+                borderColor: theme.border,
+              },
+            ]}
+          >
             <View style={styles.nutritionCell}>
-              <Text style={[styles.nutritionValue, { color: theme.text }]}>
+              <Text style={[styles.nutritionVal, { color: theme.text }]}>
                 {selectedRecipe.nutrition.calories}
               </Text>
-              <Text style={[styles.nutritionLabel, { color: theme.textSubtle }]}>kcal</Text>
+              <Text style={[styles.nutritionLbl, { color: theme.textMuted }]}>kcal</Text>
             </View>
             <View style={styles.nutritionCell}>
-              <Text style={[styles.nutritionValue, { color: theme.text }]}>
+              <Text style={[styles.nutritionVal, { color: theme.text }]}>
                 {selectedRecipe.nutrition.proteinGrams}g
               </Text>
-              <Text style={[styles.nutritionLabel, { color: theme.textSubtle }]}>Protein</Text>
+              <Text style={[styles.nutritionLbl, { color: theme.textMuted }]}>Protein</Text>
             </View>
             <View style={styles.nutritionCell}>
-              <Text style={[styles.nutritionValue, { color: theme.text }]}>
+              <Text style={[styles.nutritionVal, { color: theme.text }]}>
                 {selectedRecipe.nutrition.carbsGrams}g
               </Text>
-              <Text style={[styles.nutritionLabel, { color: theme.textSubtle }]}>Carbs</Text>
+              <Text style={[styles.nutritionLbl, { color: theme.textMuted }]}>Carbs</Text>
             </View>
             <View style={styles.nutritionCell}>
-              <Text style={[styles.nutritionValue, { color: theme.text }]}>
+              <Text style={[styles.nutritionVal, { color: theme.text }]}>
                 {selectedRecipe.nutrition.fatGrams}g
               </Text>
-              <Text style={[styles.nutritionLabel, { color: theme.textSubtle }]}>Fat</Text>
+              <Text style={[styles.nutritionLbl, { color: theme.textMuted }]}>Fat</Text>
             </View>
+            <MaterialIcons name="chevron-right" size={20} color={theme.textSubtle} />
+          </TouchableOpacity>
+        )}
+
+        {/* Ingredients Section + Inline Language Selector */}
+        <View style={{ gap: 10 }}>
+          <View style={styles.sectionHeaderBetween}>
+            <Text style={[styles.headlineMd, { color: theme.text }]}>Ingredients</Text>
+            <TouchableOpacity
+              onPress={() => setIsLangModalOpen(true)}
+              activeOpacity={0.75}
+              style={[
+                styles.langSelectorPill,
+                {
+                  backgroundColor: theme.surfaceContainerLow,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <MaterialIcons name="translate" size={15} color={theme.saffronOrange} />
+              <Text style={[styles.labelSm, { color: theme.text }]}>
+                {activeLangObj?.label || 'English'}
+              </Text>
+              <MaterialIcons name="expand-more" size={16} color={theme.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ gap: 8 }}>
+            {allIngredients.map((ing) => {
+              const isChecked = Boolean(checkedIngredients[ing.id]);
+              return (
+                <TouchableOpacity
+                  key={ing.id}
+                  onPress={() => toggleIngredient(ing.id)}
+                  activeOpacity={0.75}
+                  style={[
+                    styles.ingredientRowCard,
+                    {
+                      backgroundColor: theme.surfaceContainerLowest,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                    <MaterialIcons
+                      name={isChecked ? 'check-box' : 'check-box-outline-blank'}
+                      size={22}
+                      color={isChecked ? theme.herbGreen : theme.textSubtle}
+                    />
+                    <Text
+                      style={[
+                        styles.bodyMd,
+                        {
+                          flex: 1,
+                          fontSize: 15,
+                          color: isChecked ? theme.textSubtle : theme.text,
+                          textDecorationLine: isChecked ? 'line-through' : 'none',
+                        },
+                      ]}
+                    >
+                      {ing.name}
+                    </Text>
+                  </View>
+                  <Text style={[styles.labelSm, { color: theme.textMuted }]}>{ing.tag}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
-      )}
 
-      {/* Ingredients Card */}
-      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        {selectedRecipe.ingredientsUsed && selectedRecipe.ingredientsUsed.length > 0 && (
-          <>
-            <Text style={[styles.subheading, { color: theme.text, marginTop: 0 }]}>
-              Fridge Items Used:
+        {/* Steps Section */}
+        <View style={{ gap: 10 }}>
+          <View style={styles.sectionHeaderBetween}>
+            <Text style={[styles.headlineMd, { color: theme.text }]}>Steps</Text>
+            <Text style={[styles.monoText, { color: theme.textMuted }]}>
+              Step {currentStepIdx + 1} of {Math.max(1, steps.length)}
             </Text>
-            <Text style={[styles.bodyListText, { color: theme.textMuted }]}>
-              {(translatedIngredients?.used || selectedRecipe.ingredientsUsed).join(', ')}
-            </Text>
-          </>
-        )}
+          </View>
 
-        {selectedRecipe.additionalIngredients && selectedRecipe.additionalIngredients.length > 0 && (
-          <>
-            <Text style={[styles.subheading, { color: theme.text }]}>Other Ingredients Needed:</Text>
-            <Text style={[styles.bodyListText, { color: theme.textMuted }]}>
-              {(translatedIngredients?.additional || selectedRecipe.additionalIngredients).join(', ')}
-            </Text>
-          </>
-        )}
+          <View style={{ gap: 10 }}>
+            {steps.map((step, sIdx) => {
+              const isDone = sIdx < currentStepIdx;
+              const isCurrent = sIdx === currentStepIdx;
+              const isActiveSpeech =
+                isCurrentRecipeSpeech && activeSpeechState?.stepIndex === sIdx;
+              const isHighlightedOriginal =
+                isActiveSpeech && !activeSpeechState?.translatedText;
+              const isHighlightedTranslated =
+                isActiveSpeech && Boolean(activeSpeechState?.translatedText);
 
-        {selectedRecipe.missingIngredients && selectedRecipe.missingIngredients.length > 0 && (
-          <>
-            <Text style={[styles.subheading, { color: theme.text }]}>Common Pantry Staples Needed:</Text>
-            <Text style={[styles.bodyListText, { color: theme.textMuted, marginBottom: 0 }]}>
-              {(translatedIngredients?.pantry || selectedRecipe.missingIngredients).join(', ')}
-            </Text>
-          </>
-        )}
-      </View>
+              const glowStyle = {
+                color: theme.glowText,
+                fontWeight: '800',
+                textShadowColor: theme.glowShadow,
+                textShadowOffset: { width: 0, height: 0 },
+                textShadowRadius: 8,
+              };
 
-      {/* Preparation Steps with Live Word-by-Word Glow */}
-      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <View style={[styles.stepsHeaderRow, { marginTop: 0, marginBottom: 12 }]}>
-          <Text style={[styles.subheading, { color: theme.text, marginTop: 0 }]}>Preparation Steps</Text>
-          {selectedRecipe.steps && selectedRecipe.steps.length > 0 && (
-            <View style={styles.dictationControlsRow}>
-              {isCurrentRecipeSpeech && (isSpeaking || isPreparingSpeech) ? (
-                <>
-                  <TouchableOpacity
+              return (
+                <TouchableOpacity
+                  key={`step-${sIdx}`}
+                  onPress={() => onSpeakStep(selectedRecipe, sIdx)}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.stepCard,
+                    {
+                      backgroundColor: isCurrent
+                        ? theme.surfaceContainerLowest
+                        : isDone
+                        ? theme.surfaceContainerLow
+                        : theme.surfaceContainerLowest,
+                      borderColor: isCurrent ? theme.saffronOrange : theme.border,
+                    },
+                  ]}
+                >
+                  <Text
                     style={[
-                      styles.dictBtnSmall,
-                      { backgroundColor: theme.cardAlt, borderColor: theme.borderStrong },
-                      (activeSpeechState?.stepIndex ?? 0) === 0 && { opacity: 0.4 },
-                    ]}
-                    onPress={() =>
-                      onSpeakStep(selectedRecipe, Math.max(0, (activeSpeechState?.stepIndex ?? 0) - 1))
-                    }
-                    disabled={(activeSpeechState?.stepIndex ?? 0) === 0}
-                  >
-                    <Text style={[styles.dictBtnSmallText, { color: theme.text }]}>&lt; Prev</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.dictBtnSmall,
-                      { backgroundColor: theme.cardAlt, borderColor: theme.borderStrong },
-                      (activeSpeechState?.stepIndex ?? 0) >= selectedRecipe.steps.length - 1 && {
-                        opacity: 0.4,
+                      styles.labelSm,
+                      {
+                        color: isCurrent
+                          ? theme.primary
+                          : isDone
+                          ? theme.secondary
+                          : theme.textMuted,
                       },
                     ]}
-                    onPress={() =>
-                      onSpeakStep(
-                        selectedRecipe,
-                        Math.min(
-                          selectedRecipe.steps.length - 1,
-                          (activeSpeechState?.stepIndex ?? 0) + 1
-                        )
-                      )
-                    }
-                    disabled={(activeSpeechState?.stepIndex ?? 0) >= selectedRecipe.steps.length - 1}
                   >
-                    <Text style={[styles.dictBtnSmallText, { color: theme.text }]}>Next &gt;</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.dictBtnStop} onPress={onStopDictation}>
-                    <Text style={styles.dictBtnStopText}>Stop</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.dictBtnPlay, { backgroundColor: theme.accent }]}
-                  onPress={() =>
-                    onSpeakStep(
-                      selectedRecipe,
-                      isCurrentRecipeSpeech ? activeSpeechState?.stepIndex ?? 0 : 0
-                    )
-                  }
-                >
-                  <Text style={[styles.dictBtnPlayText, { color: theme.accentText }]}>
-                    {isPreparingSpeech ? 'Preparing...' : 'Listen Steps'}
+                    {isCurrent
+                      ? `Step ${sIdx + 1} • Now`
+                      : isDone
+                      ? `Step ${sIdx + 1} • Done`
+                      : `Step ${sIdx + 1}`}
                   </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
 
-        {(selectedRecipe.steps || []).map((step, sIdx) => {
-          const isActiveStep = isCurrentRecipeSpeech && activeSpeechState?.stepIndex === sIdx;
-          const isHighlightedOriginal = isActiveStep && !activeSpeechState?.translatedText;
-          const isHighlightedTranslated = isActiveStep && Boolean(activeSpeechState?.translatedText);
-
-          const glowStyle = {
-            color: theme.glowText,
-            fontWeight: '800',
-            textShadowColor: theme.glowShadow,
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 10,
-          };
-
-          return (
-            <TouchableOpacity
-              key={`detail-step-${sIdx}`}
-              style={[
-                styles.stepRow,
-                isActiveStep && [styles.stepRowActive, { backgroundColor: theme.stepActiveBg }],
-              ]}
-              onPress={() => onSpeakStep(selectedRecipe, sIdx)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.stepNumber, { color: theme.text }]}>{sIdx + 1}.</Text>
-              <View style={{ flex: 1 }}>
-                {isHighlightedOriginal && activeSpeechState?.spans?.length > 0 ? (
-                  <Text style={[styles.stepText, { color: theme.textMuted }]}>
-                    {activeSpeechState.spans.map((span, wIdx) => (
-                      <Text key={`w-${wIdx}`} style={wIdx === activeWordIndex ? glowStyle : undefined}>
-                        {span.text}
-                      </Text>
-                    ))}
-                  </Text>
-                ) : (
-                  <Text style={[styles.stepText, { color: theme.textMuted }]}>{step}</Text>
-                )}
-
-                {isHighlightedTranslated ? (
-                  activeSpeechState?.spans?.length > 0 ? (
-                    <Text style={[styles.translatedStepText, { color: theme.text }]}>
+                  {isHighlightedOriginal && activeSpeechState?.spans?.length > 0 ? (
+                    <Text style={[styles.bodyMd, { color: theme.text, fontSize: 15, lineHeight: 22 }]}>
                       {activeSpeechState.spans.map((span, wIdx) => (
-                        <Text key={`tw-${wIdx}`} style={wIdx === activeWordIndex ? glowStyle : undefined}>
+                        <Text
+                          key={`w-${wIdx}`}
+                          style={wIdx === activeWordIndex ? glowStyle : undefined}
+                        >
                           {span.text}
                         </Text>
                       ))}
                     </Text>
                   ) : (
-                    <Text style={[styles.translatedStepText, { color: theme.text }]}>
-                      {activeSpeechState.translatedText}
+                    <Text
+                      style={[
+                        styles.bodyMd,
+                        {
+                          color: isDone ? theme.textMuted : theme.text,
+                          fontSize: isCurrent ? 15 : 14,
+                          lineHeight: isCurrent ? 22 : 20,
+                        },
+                      ]}
+                    >
+                      {step}
                     </Text>
-                  )
-                ) : null}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+                  )}
 
-        {selectedRecipe.chefTip ? (
+                  {isHighlightedTranslated ? (
+                    activeSpeechState?.spans?.length > 0 ? (
+                      <Text
+                        style={[
+                          styles.bodyMd,
+                          { color: theme.primary, fontSize: 15, lineHeight: 22, marginTop: 4 },
+                        ]}
+                      >
+                        {activeSpeechState.spans.map((span, wIdx) => (
+                          <Text
+                            key={`tw-${wIdx}`}
+                            style={wIdx === activeWordIndex ? glowStyle : undefined}
+                          >
+                            {span.text}
+                          </Text>
+                        ))}
+                      </Text>
+                    ) : (
+                      <Text
+                        style={[
+                          styles.bodyMd,
+                          { color: theme.primary, fontSize: 15, lineHeight: 22, marginTop: 4 },
+                        ]}
+                      >
+                        {activeSpeechState.translatedText}
+                      </Text>
+                    )
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {selectedRecipe.chefTip ? (
+            <View
+              style={[
+                styles.chefTipBox,
+                {
+                  backgroundColor: theme.surfaceContainerLow,
+                  borderLeftColor: theme.saffronOrange,
+                },
+              ]}
+            >
+              <Text style={[styles.labelLg, { color: theme.text }]}>Chef's Secret</Text>
+              <Text style={[styles.bodyMd, { color: theme.textMuted }]}>
+                {selectedRecipe.chefTip}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </ScrollView>
+
+      {/* Calm Floating Voice Player */}
+      {steps.length > 0 && (
+        <View style={[styles.voiceBarWrapper, { backgroundColor: 'transparent' }]}>
+          <View style={[styles.voiceBarPill, { backgroundColor: theme.inverseSurface }]}>
+            <Text
+              style={[styles.labelSm, { color: theme.inverseOnSurface, flex: 1 }]}
+              numberOfLines={1}
+            >
+              Step {currentStepIdx + 1} of {steps.length} • {activeLangObj?.label || 'English'}
+              {isPreparingSpeech ? ' • Preparing…' : isSpeaking ? ' • Speaking' : ''}
+            </Text>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <TouchableOpacity
+                onPress={() => onSpeakStep(selectedRecipe, Math.max(0, currentStepIdx - 1))}
+                disabled={currentStepIdx === 0}
+                style={[styles.voiceCtrlBtn, { opacity: currentStepIdx === 0 ? 0.35 : 1 }]}
+                accessibilityLabel="Previous step"
+              >
+                <MaterialIcons name="skip-previous" size={22} color={theme.inverseOnSurface} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleTogglePlay}
+                style={[styles.voicePlayCircle, { backgroundColor: theme.saffronOrange }]}
+                accessibilityLabel={isSpeaking ? 'Stop voice guidance' : 'Play voice guidance'}
+              >
+                <MaterialIcons
+                  name={
+                    isPreparingSpeech
+                      ? 'hourglass-top'
+                      : isCurrentRecipeSpeech && isSpeaking
+                      ? 'pause'
+                      : 'play-arrow'
+                  }
+                  size={22}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() =>
+                  onSpeakStep(selectedRecipe, Math.min(steps.length - 1, currentStepIdx + 1))
+                }
+                disabled={currentStepIdx >= steps.length - 1}
+                style={[
+                  styles.voiceCtrlBtn,
+                  { opacity: currentStepIdx >= steps.length - 1 ? 0.35 : 1 },
+                ]}
+                accessibilityLabel="Next step"
+              >
+                <MaterialIcons name="skip-next" size={22} color={theme.inverseOnSurface} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Language Picker Modal */}
+      <Modal
+        visible={isLangModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsLangModalOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsLangModalOpen(false)}
+        >
           <View
             style={[
-              styles.chefTipBox,
-              { backgroundColor: theme.cardAlt, borderLeftColor: theme.accent },
+              styles.modalCard,
+              {
+                backgroundColor: theme.surfaceContainerLowest,
+                borderColor: theme.border,
+                maxHeight: '75%',
+              },
             ]}
           >
-            <Text style={[styles.chefTipTitle, { color: theme.text }]}>Chef's Secret:</Text>
-            <Text style={[styles.chefTipText, { color: theme.textMuted }]}>
-              {selectedRecipe.chefTip}
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              Voice & Ingredient Language
             </Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {supportedLanguages.map((lang) => {
+                const active = lang.code === speechLanguage;
+                return (
+                  <TouchableOpacity
+                    key={lang.code}
+                    onPress={() => {
+                      onSelectLanguage(lang.code);
+                      setIsLangModalOpen(false);
+                    }}
+                    style={[
+                      styles.ingredientRowCard,
+                      {
+                        backgroundColor: active
+                          ? theme.primaryContainer
+                          : theme.surfaceContainerLow,
+                        borderColor: active ? theme.saffronOrange : theme.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.labelLg,
+                        { color: active ? theme.onPrimaryContainer : theme.text },
+                      ]}
+                    >
+                      {lang.code === 'en' ? 'English' : `${lang.label} (${lang.nativeLabel})`}
+                    </Text>
+                    {active && (
+                      <MaterialIcons
+                        name="check"
+                        size={18}
+                        color={theme.onPrimaryContainer}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
-        ) : null}
-      </View>
-    </ScrollView>
+        </TouchableOpacity>
+      </Modal>
+    </View>
   );
 }

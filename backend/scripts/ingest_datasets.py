@@ -19,6 +19,7 @@ import xml.etree.ElementTree as ET
 from collections import defaultdict
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+DBS_DIR = os.path.join(ROOT_DIR, 'dbs')
 OUTPUT_PATH = os.path.join(ROOT_DIR, 'backend', 'data', 'recipes_catalog.json')
 
 STATE_CODE_MAP = {
@@ -117,7 +118,7 @@ def estimate_difficulty(total_time, num_steps):
 
 
 def load_eda_indian_food():
-    path = os.path.join(ROOT_DIR, 'EDA-On-Indian-Food', 'IndianDishes.csv')
+    path = os.path.join(DBS_DIR, 'EDA-On-Indian-Food', 'IndianDishes.csv')
     items = []
     with open(path, newline='', encoding='utf-8', errors='replace') as f:
         reader = csv.DictReader(f)
@@ -171,7 +172,7 @@ def load_eda_indian_food():
 
 
 def load_indian_food_dataset():
-    path = os.path.join(ROOT_DIR, 'Indian-Food', 'IndianFoodDataset.csv')
+    path = os.path.join(DBS_DIR, 'Indian-Food', 'IndianFoodDataset.csv')
     items = []
     with open(path, newline='', encoding='utf-8', errors='replace') as f:
         reader = csv.DictReader(f)
@@ -247,7 +248,7 @@ def parse_xlsx_sheet(z, shared, sheet_path):
 
 
 def load_eastern_food_harvard():
-    path = os.path.join(ROOT_DIR, 'eastern-food-harvardstudy', '05Database_of eastern_indian_dishes.xlsx')
+    path = os.path.join(DBS_DIR, 'eastern-food-harvardstudy', '05Database_of eastern_indian_dishes.xlsx')
     ns = {'s': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
     with zipfile.ZipFile(path) as z:
         shared = []
@@ -323,7 +324,7 @@ def load_eastern_food_harvard():
 
 
 def load_food_eaten_in_india():
-    base = os.path.join(ROOT_DIR, 'food-eaten-in-india')
+    base = os.path.join(DBS_DIR, 'food-eaten-in-india')
 
     ing_by_id = defaultdict(list)
     with open(os.path.join(base, 'ingredients.csv'), newline='', encoding='utf-8', errors='replace') as f:
@@ -397,7 +398,7 @@ def load_food_eaten_in_india():
 
 
 def load_sangat_food_db():
-    data_dir = os.path.join(ROOT_DIR, 'sangat-food-db', 'data')
+    data_dir = os.path.join(DBS_DIR, 'sangat-food-db', 'data')
     items = []
     for root_path, _, files in os.walk(data_dir):
         for fname in files:
@@ -438,9 +439,9 @@ def load_sangat_food_db():
 
 
 def load_culinary_db():
-    details_path = os.path.join(ROOT_DIR, 'CulinaryDB', '01_Recipe_Details.csv')
-    aliases_path = os.path.join(ROOT_DIR, 'CulinaryDB', '04_Recipe-Ingredients_Aliases.csv')
-    ing_meta_path = os.path.join(ROOT_DIR, 'CulinaryDB', '02_Ingredients.csv')
+    details_path = os.path.join(DBS_DIR, 'CulinaryDB', '01_Recipe_Details.csv')
+    aliases_path = os.path.join(DBS_DIR, 'CulinaryDB', '04_Recipe-Ingredients_Aliases.csv')
+    ing_meta_path = os.path.join(DBS_DIR, 'CulinaryDB', '02_Ingredients.csv')
     if not os.path.exists(details_path):
         return []
 

@@ -438,6 +438,14 @@ export async function searchRecipesByVector({
         ? item.steps
         : [item.description || `Prepare ${item.title} using ${(item.ingredients || []).slice(0, 6).join(', ')}.`];
 
+    const matchedCount = detailed.matched.length;
+    const additionalCount = detailed.additional.length;
+    const totalNonStaple = matchedCount + additionalCount;
+    const matchPercent =
+      totalNonStaple > 0
+        ? Math.max(40, Math.min(100, Math.round((matchedCount / totalNonStaple) * 100)))
+        : Math.max(55, Math.min(95, Math.round(s.combinedScore * 100)));
+
     return {
       id: item.id,
       title: item.localName ? `${item.title} (${item.localName})` : item.title,
@@ -446,6 +454,7 @@ export async function searchRecipesByVector({
       description: item.description || `Authentic ${item.region || 'Indian'} dish.`,
       cookTimeMinutes: item.cookTimeMinutes || item.totalTimeMinutes || 25,
       difficulty: item.difficulty || 'Easy',
+      matchPercent,
       ingredientsUsed: detailed.matched.length > 0 ? detailed.matched : (item.ingredients || []).slice(0, 5).map(cleanIngredientLabel).filter(Boolean),
       missingIngredients: detailed.pantryStaples,
       additionalIngredients: detailed.additional,

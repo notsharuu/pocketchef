@@ -42,6 +42,7 @@ import CaptureScreen from './src/screens/CaptureScreen';
 import InventoryScreen from './src/screens/InventoryScreen';
 import RecipesScreen from './src/screens/RecipesScreen';
 import RecipeDetailScreen from './src/screens/RecipeDetailScreen';
+import NutritionScreen from './src/screens/NutritionScreen';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -247,7 +248,13 @@ export default function App() {
               stopDictationRef.current?.();
             }
             setCurrentScreen((prev) =>
-              prev === 'recipeDetail' ? 'recipes' : prev === 'recipes' ? 'inventory' : 'capture'
+              prev === 'nutrition'
+                ? 'recipeDetail'
+                : prev === 'recipeDetail'
+                ? 'recipes'
+                : prev === 'recipes'
+                ? 'inventory'
+                : 'capture'
             );
           });
         } else {
@@ -412,7 +419,7 @@ export default function App() {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
         allowsEditing: false,
-        quality: 0.5,
+        quality: 0.9,
         base64: true,
       });
       if (!result.canceled && result.assets?.[0]) {
@@ -440,7 +447,7 @@ export default function App() {
         allowsEditing: false,
         allowsMultipleSelection: true,
         selectionLimit: remainingSlots,
-        quality: 0.5,
+        quality: 0.9,
         base64: true,
       });
       if (!result.canceled && result.assets?.length > 0) {
@@ -629,6 +636,18 @@ export default function App() {
           setTempUrl(backendUrl);
           setIsUrlModalVisible(true);
         }}
+        onBack={() => {
+          if (currentScreen === 'nutrition') {
+            setCurrentScreen('recipeDetail');
+          } else if (currentScreen === 'recipeDetail') {
+            stopDictation();
+            setCurrentScreen('recipes');
+          } else if (currentScreen === 'recipes') {
+            setCurrentScreen('inventory');
+          } else if (currentScreen === 'inventory') {
+            setCurrentScreen('capture');
+          }
+        }}
       />
 
       <Animated.View
@@ -646,6 +665,7 @@ export default function App() {
               isScanning={isScanning}
               stagedPhotos={stagedPhotos}
               progressWidth={progressWidth}
+              scanStageIndex={scanStageIndex}
               scanStageText={SCAN_STAGES[scanStageIndex]}
               onAddFromCamera={addFromCamera}
               onAddFromGallery={addFromGallery}
@@ -704,6 +724,7 @@ export default function App() {
               styles={styles}
               filteredRecipes={filteredRecipes}
               selectedRecipeCategory={selectedRecipeCategory}
+              selectedCount={selectedCount}
               onSelectRecipeCategory={setSelectedRecipeCategory}
               onBackToInventory={() => setCurrentScreen('inventory')}
               onStartNewScan={startNewScan}
@@ -720,6 +741,7 @@ export default function App() {
             <RecipeDetailScreen
               theme={theme}
               styles={styles}
+              backendUrl={backendUrl}
               selectedRecipe={selectedRecipe}
               supportedLanguages={supportedLanguages}
               speechLanguage={speechLanguage}
@@ -740,6 +762,15 @@ export default function App() {
               }}
               onSpeakStep={speakRecipeStep}
               onStopDictation={stopDictation}
+              onOpenNutrition={() => setCurrentScreen('nutrition')}
+            />
+          )}
+
+          {currentScreen === 'nutrition' && selectedRecipe && (
+            <NutritionScreen
+              theme={theme}
+              styles={styles}
+              selectedRecipe={selectedRecipe}
             />
           )}
         </KeyboardAvoidingView>

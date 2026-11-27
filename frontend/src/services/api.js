@@ -137,3 +137,9 @@ export function translateItemsBatch(backendUrl, { items, targetLanguage, recipeI
 export function buildSpeakAudioUrl(backendUrl, { text, language }) {
   return `${backendUrl}/api/tts/speak?text=${encodeURIComponent(text)}&language=${encodeURIComponent(language)}`;
 }
+
+export function fetchRecipeVideo(backendUrl, { title, cuisine }, signal) {
+  const params = new URLSearchParams({ title: title || '' });
+  if (cuisine) params.set('cuisine', cuisine);
+  return requestJson(`${backendUrl}/api/recipes/video?${params.toString()}`, { signal }, 10000);
+}
